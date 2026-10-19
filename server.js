@@ -8,7 +8,7 @@ try { process.loadEnvFile(join(root, '.env')); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
 
 const port = Number.parseInt(process.env.PORT || '4173', 10);
-const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 const maxClaims = 5;
 const cacheTtl = 10 * 60 * 1000;
 const maxCounterSearches = 2;
