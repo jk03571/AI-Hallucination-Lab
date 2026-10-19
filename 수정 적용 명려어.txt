@@ -1,0 +1,18 @@
+
+
+
+2. 로컬에서 테스트
+PowerShell에서 프로젝트 폴더로 이동한 다음:
+
+
+npm.cmd run dev
+
+그리고:
+
+
+http://localhost:4173
+
+
+git add .
+git commit -m "프로그램 수정"
+git push

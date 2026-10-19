@@ -8,8 +8,11 @@ AI 답변에서 사실 주장(Claim)을 추출하고, Tavily 웹 검색 Evidence
 - Claim별 Tavily 검색 결과(title, URL, content, score) 표시
 - TRUE, FALSE, PARTIALLY TRUE, UNCERTAIN 판정 및 보수적 confidence
 - 전체 판정 분포와 Hallucination Rate 표시
+- 선택적 반례 검색, 누락 조건, 시간 민감도, 과도한 확신 및 출처 인용 확인
+- 원본 답변 주장 간 내부 모순 분석
 - API 키는 서버에서만 읽고 브라우저로 전달하지 않음
 - 동일 Claim 검색 결과를 10분간 메모리 캐시
+- 동일 입력의 검증 결과를 3분간 메모리 캐시 (최대 100건)
 
 ## 실행
 
@@ -38,7 +41,9 @@ npm start
 
 ## 검증 흐름
 
-입력 답변 → Gemini Claim 추출 → Claim별 Tavily 검색 → 검색 Evidence와 Claim을 Gemini가 비교 → 판정 및 Hallucination Rate 계산 순서입니다. 검색 결과가 없으면 해당 Claim은 UNCERTAIN으로 처리합니다.
+입력 답변 → Gemini Claim 추출 및 내부 모순 확인 → Claim별 Tavily 검색 → 필요 시 최대 2개 주장에 반례 검색 → Gemini가 전체 Claim/Evidence와 추가 위험 분석을 한 번에 판정 → Hallucination Rate 계산 순서입니다. Gemini 호출은 요청당 보통 2회이며, Claim별 호출은 하지 않습니다. 동일 입력 결과는 3분, 검색은 10분간 서버 메모리에 임시 캐시되며 디스크에는 저장하지 않습니다. 검색 결과가 없거나 차단 출처만 남으면 해당 Claim은 UNCERTAIN으로 처리합니다.
+
+Tavily 결과에서 Wikipedia, 위키류, 블로그, 카페 및 주요 커뮤니티 도메인과 하위 도메인은 제거합니다. 검색 결과는 출처 우선순위, Tavily 점수, 본문 관련도를 반영해 정렬하고, 판정 요청에는 Claim당 최대 5개를 전달합니다.
 
 ## 테스트 입력
 
