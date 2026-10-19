@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f8f7">
+  <meta name="description" content="AI가 생성한 답변을 실제 웹 근거와 비교해 검증합니다.">
+  <title>AI Hallucination Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="AI Hallucination Lab 홈"><span class="brand-mark">✳</span><span>HALLUCINATION <b>LAB</b></span></a>
+      <div class="top-meta"><span class="live-indicator"></span><span id="mode-label">LIVE SEARCH MODE</span><button class="icon-button" id="about-button" aria-label="서비스 안내" title="서비스 안내">ⓘ</button></div>
+    </header>
+
+    <main id="top">
+      <section class="intro">
+        <div class="eyebrow"><span class="eyebrow-line"></span>AI ANSWER VERIFICATION <span class="eyebrow-index">01 / 03</span></div>
+        <h1>AI가 말한 내용,<br><span>정말 사실일까?</span></h1>
+        <p class="intro-copy">AI의 주장을 실제 근거와 비교하여 환각 여부를 검증합니다.</p>
+      </section>
+
+      <section class="workspace" aria-label="답변 검증 도구">
+        <div class="input-heading"><div><span class="section-kicker">01 — INPUT</span><h2>검증할 답변</h2></div><span class="character-count" id="character-count">0 / 16,000</span></div>
+        <label class="sr-only" for="answer-input">검증하고 싶은 AI 답변</label>
+        <textarea id="answer-input" maxlength="16000" placeholder="검증하고 싶은 AI의 답변을 입력하세요.&#10;예:&#10;대한민국의 수도는 부산이며, 인구는 약 500만 명이다."></textarea>
+        <div class="input-footer"><button class="text-button" id="example-button"><span class="sparkle">✳</span> 예시 입력</button><div class="input-actions"><span class="privacy-note">입력 내용은 저장되지 않습니다</span><button class="primary-button" id="verify-button"><span>답변 검증하기</span><span class="button-arrow">↗</span></button></div></div>
+        <div class="options-row"><span class="mode-description" id="mode-description">Gemini가 주장을 분석하고 Tavily가 외부 근거를 검색합니다</span><button class="text-button setup-link" id="setup-button">API 설정 안내 <span>↗</span></button></div>
+      </section>
+
+      <section class="progress-panel hidden" id="progress-panel" aria-live="polite">
+        <div class="progress-head"><span class="section-kicker">ANALYSIS IN PROGRESS</span><span class="progress-label" id="progress-label">답변을 분석하고 있습니다</span></div>
+        <div class="progress-track"><span id="progress-bar"></span></div>
+        <div class="steps" id="steps"><div class="step active"><span class="step-mark">01</span><span>답변 분석</span></div><div class="step"><span class="step-mark">02</span><span>Claim 추출</span></div><div class="step"><span class="step-mark">03</span><span>웹 근거 검색</span></div><div class="step"><span class="step-mark">04</span><span>근거 분석</span></div><div class="step"><span class="step-mark">05</span><span>최종 판정</span></div></div>
+      </section>
+
+      <section class="results hidden" id="results" aria-live="polite"></section>
+      <div class="error-message hidden" id="error-message" role="alert"></div>
+    </main>
+
+    <footer><span>AI HALLUCINATION LAB <span class="footer-dot">·</span> FACTS NEED SOURCES</span><span>이 결과는 검색된 근거를 기반으로 한 검증 보조 결과이며, 중요한 정보는 원문 출처를 직접 확인하세요.</span></footer>
+  </div>
+  <dialog id="info-dialog"><button class="dialog-close" aria-label="닫기">×</button><span class="section-kicker">ABOUT THIS LAB</span><h2>근거와 함께 읽는 AI 답변</h2><p>Gemini는 주장 추출과 근거 비교를 담당하고, Tavily 검색 결과가 외부 Evidence로 사용됩니다.</p><p>검증 결과는 참고용이며, 중요한 결정에는 원문 자료를 직접 확인해 주세요.</p><button class="dialog-action">확인</button></dialog>
+  <dialog id="setup-dialog"><button class="dialog-close" aria-label="닫기">×</button><span class="section-kicker">LIVE API SETUP</span><h2>실제 검색 검증 설정</h2><p>API 키는 서버에서만 읽으며 브라우저에 노출하지 않습니다.</p><ol><li><code>outputs/.env.example</code>을 참고해 <code>outputs/.env</code>를 만듭니다.</li><li><code>GEMINI_API_KEY</code>와 <code>TAVILY_API_KEY</code>를 입력합니다.</li><li>서버를 다시 시작한 뒤 검증을 실행합니다.</li></ol><p class="cost-note">검색 및 모델 API의 한도와 요금은 계정에 따라 달라질 수 있습니다.</p><button class="dialog-action">확인</button></dialog>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
