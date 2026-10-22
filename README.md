@@ -7,9 +7,9 @@ AI 답변에서 사실 주장(Claim)을 추출하고, Tavily 웹 검색 Evidence
 - Gemini 기반 Claim 추출 및 Evidence 비교 판정
 - Claim별 Tavily 검색 결과(title, URL, content, score) 표시
 - TRUE, FALSE, PARTIALLY TRUE, UNCERTAIN 판정 및 보수적 confidence
-- 전체 판정 분포와 Hallucination Rate 표시
-- 선택적 반례 검색, 누락 조건, 시간 민감도, 과도한 확신 및 출처 인용 확인
-- 원본 답변 주장 간 내부 모순 분석
+- 전체 발견 주장, 검증 주장, 미검증 주장과 검증 범위 표시
+- 실제 판정된 주장만 사용한 Hallucination Rate 표시
+- 검증 우선순위와 답변 전반의 구간별 표본 선택
 - API 키는 서버에서만 읽고 브라우저로 전달하지 않음
 - 동일 Claim 검색 결과를 10분간 메모리 캐시
 - 동일 입력의 검증 결과를 3분간 메모리 캐시 (최대 100건)
@@ -37,13 +37,13 @@ Copy-Item .env.example .env
 npm start
 ```
 
-`GEMINI_MODEL` 기본값은 `gemini-3.8-flash`이며 환경변수로 변경할 수 있습니다. 키가 없으면 서버는 충돌하지 않고 화면에 `API 키를 설정해주세요.`를 표시합니다.
+`GEMINI_MODEL` 기본값은 `gemini-3.6-flash`이며 환경변수로 변경할 수 있습니다. 키가 없으면 서버는 충돌하지 않고 화면에 `API 키를 설정해주세요.`를 표시합니다.
 
 ## 검증 흐름
 
-입력 답변 → Gemini Claim 추출 및 내부 모순 확인 → Claim별 Tavily 검색 → 필요 시 최대 2개 주장에 반례 검색 → Gemini가 전체 Claim/Evidence와 추가 위험 분석을 한 번에 판정 → Hallucination Rate 계산 순서입니다. Gemini 호출은 요청당 보통 2회이며, Claim별 호출은 하지 않습니다. 동일 입력 결과는 3분, 검색은 10분간 서버 메모리에 임시 캐시되며 디스크에는 저장하지 않습니다. 검색 결과가 없거나 차단 출처만 남으면 해당 Claim은 UNCERTAIN으로 처리합니다.
+입력 답변 → Gemini가 최대 30개까지 안전 상한 내에서 전체 사실 주장을 추출 → 중복 제거 및 우선순위/구간 분포에 따라 검증 예산 8/10/12개 선택 → 선택된 주장만 Claim별 Tavily 검색 → Gemini 한 번으로 전체 판정 → 결과 요약 순서입니다. 정상 요청은 Gemini 호출 2회이며 Claim별 Gemini 호출은 없습니다. 검색하지 않은 주장도 `unverified`로 응답에 남겨 발견 주장 수와 검증 수를 구분합니다. Hallucination Rate는 `FALSE / (TRUE + FALSE + PARTIALLY_TRUE)`로 계산하며 UNCERTAIN과 미검증 주장은 포함하지 않습니다. 동일 입력 결과는 3분, 검색은 10분간 서버 메모리에 임시 캐시되며 디스크에는 저장하지 않습니다. 검색 결과가 없거나 차단 출처만 남으면 해당 Claim은 UNCERTAIN으로 처리합니다.
 
-Tavily 결과에서 Wikipedia, 위키류, 블로그, 카페 및 주요 커뮤니티 도메인과 하위 도메인은 제거합니다. 검색 결과는 출처 우선순위, Tavily 점수, 본문 관련도를 반영해 정렬하고, 판정 요청에는 Claim당 최대 5개를 전달합니다.
+Tavily 결과에서 Wikipedia, 위키류, 블로그, 카페 및 주요 커뮤니티 도메인과 하위 도메인은 제거합니다. 검색 결과는 출처 우선순위, Tavily 점수, 본문 관련도를 반영해 정렬하고, 판정 요청에는 Claim당 최대 5개를 전달합니다. Claim 검색 결과는 10분 캐시되고 동일 검색 및 동일 검증의 동시 요청은 in-flight 작업을 공유합니다.
 
 ## 테스트 입력
 

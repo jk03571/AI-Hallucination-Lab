@@ -444,6 +444,10 @@ textarea:focus {
   overflow: hidden;
 }
 
+.claim-unverified { border-style: dashed; background: #fbfcfb; }
+.claim-unverified .claim-number { color: #879992; }
+.cap-notice { color: #8a6520; }
+
 .claim-main { padding: 15px 17px 13px; }
 
 .claim-top {
