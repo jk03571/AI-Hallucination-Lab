@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createLogStreams, createExecution, emitLog, makeEvent } from './verification-logs.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { createGeminiGate, positiveInteger, requestGemini } from './gemini-client.js';
@@ -23,8 +24,9 @@ const verificationInFlight = new Map();
 const verificationCache = new Map();
 const verificationCacheTtl = 3 * 60 * 1000;
 const usageContext = new AsyncLocalStorage();
+const logStreams = createLogStreams();
 const geminiGate = createGeminiGate({ rpm: positiveInteger(process.env.GEMINI_RPM, 5), rpd: positiveInteger(process.env.GEMINI_RPD, 20), statePath: join(root, '.runtime', 'gemini-usage.json') });
-const staticFiles = new Set(['index.html', 'style.css', 'app.js']);
+const staticFiles = new Set(['index.html', 'style.css', 'app.js', 'log-view.js']);
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 
 function appError(message, status = 500, code = 'APP_ERROR') { return Object.assign(new Error(message), { status, code }); }
@@ -157,13 +159,14 @@ function relevanceScore(claim, result) {
   return terms.length ? matched / terms.length : 0;
 }
 
-async function searchTavily(query, label = 'claim') {
+async function searchTavily(query, label = 'claim', claimId = 0) {
   const key = query.trim().toLowerCase();
   const cached = searchCache.get(key);
-  if (cached && Date.now() - cached.time < cacheTtl) { console.log(`[tavily] cache hit (${label})`); return cached.results; }
+  if (cached && Date.now() - cached.time < cacheTtl) { emitLog('searchCache', { claimId }); console.log(`[tavily] cache hit (${label})`); return cached.results; }
   const active = tavilyInFlight.get(key);
-  if (active) { console.log(`[tavily] in-flight hit (${label})`); return active; }
+  if (active) { emitLog('searchShared', { claimId }); console.log(`[tavily] in-flight hit (${label})`); return active; }
   const run = (async () => {
+    emitLog('search', { claimId });
     console.log(`[tavily] searching ${label}`);
     const request = includeRawContent => fetch('https://api.tavily.com/search', {
       method: 'POST', signal: AbortSignal.timeout(60_000), headers: { 'Content-Type': 'application/json' },
@@ -171,6 +174,7 @@ async function searchTavily(query, label = 'claim') {
     });
     let response = await request(true).catch(error => { console.error('[tavily] network error'); throw appError('검색 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.', 502, 'TAVILY_NETWORK'); });
     if (!response.ok && response.status === 400) {
+      emitLog('searchFallback');
       await response.arrayBuffer().catch(() => {});
       response = await request(false).catch(error => { console.error('[tavily] fallback network error'); throw appError('검색 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.', 502, 'TAVILY_NETWORK'); });
     }
@@ -230,6 +234,7 @@ ${evidenceText}`;
 }
 
 async function analyzeInternal(answer) {
+  emitLog('extraction');
   console.log('[analyze] claim extraction started');
   if (!process.env.GEMINI_API_KEY) throw appError('Gemini API 키를 설정해주세요. 서버 폴더의 .env에 GEMINI_API_KEY를 입력한 뒤 다시 시작하세요.', 503, 'MISSING_GEMINI_KEY');
   if (!process.env.TAVILY_API_KEY) throw appError('Tavily API 키를 설정해주세요. 서버 폴더의 .env에 TAVILY_API_KEY를 입력한 뒤 다시 시작하세요.', 503, 'MISSING_TAVILY_KEY');
@@ -238,20 +243,25 @@ async function analyzeInternal(answer) {
   try { extracted = await extractClaims(answer); }
   catch (error) { console.error('[analyze] claim extraction failed; Tavily skipped:', error.code || error.status || 'unknown'); throw error; }
   const { discovered: claims, selected, budget } = selectClaims(extracted.claims);
+  emitLog('extracted', { total: claims.length, selected: selected.length });
   const claimExtractionCapped = extracted.claims.length >= extractionSafetyLimit;
   console.log(`[claim-extraction] Gemini success (${claims.length} discovered; ${selected.length} selected; budget ${budget})`);
+  if (claimExtractionCapped) emitLog('cap');
   if (claimExtractionCapped) console.warn(`[claim-extraction] safety cap reached (${extractionSafetyLimit}); additional claims may not have been returned`);
   const analysisDate = new Date().toISOString().slice(0, 10);
   const contradictions = [];
   if (!claims.length) {
+    emitLog('empty');
     const emptyResult = { claims: [], totalClaims: 0, verifiedClaims: 0, unverifiedClaims: 0, verificationCoverage: 0, claimExtractionCapped, extractionSafetyLimit, counts: { TRUE: 0, FALSE: 0, PARTIALLY_TRUE: 0, UNCERTAIN: 0 }, hallucinationRate: 0, verifiedAnswer: '검증 가능한 사실 주장을 찾지 못했습니다.', contradictionDetected: false, conflictingClaims: [], contradictionExplanation: '', analysisDate, model, searchProvider: 'Tavily' };
     cacheVerification(cacheKey, emptyResult);
     return emptyResult;
   }
   const withEvidence = await Promise.all(selected.map(async item => {
-    const evidence = await searchTavily(item.claim, `claim ${item.id}/${claims.length}`);
+    const evidence = await searchTavily(item.claim, `claim ${item.id}/${claims.length}`, item.id);
+    emitLog('sources', { claimId: item.id, count: evidence.length });
     return { ...item, evidence };
   }));
+  emitLog(withEvidence.some(item => item.evidence.length) ? 'judgment' : 'noEvidence');
   const judgmentResult = withEvidence.some(item => item.evidence.length) ? await judgeClaims(withEvidence) : { judgments: [] };
   console.log(withEvidence.some(item => item.evidence.length) ? '[claim-judgment] Gemini success' : '[claim-judgment] no evidence; Gemini skipped');
   const judgments = Array.isArray(judgmentResult.judgments) ? judgmentResult.judgments : [];
@@ -288,25 +298,31 @@ async function analyzeInternal(answer) {
   return result;
 }
 
-async function analyze(answer) {
+async function analyze(answer, channel) {
+  const execution = createExecution(channel);
   const cacheKey = answer.trim();
   const usage = { requestId: randomUUID(), geminiCalls: 0, geminiRetries: 0, byPurpose: {}, cacheHit: false, shared: false };
   try {
     const cached = verificationCache.get(cacheKey);
     if (cached && Date.now() - cached.time < verificationCacheTtl) {
       usage.cacheHit = true;
+      execution.publish('cache');
       return { ...cached.result, apiUsage: usage };
     }
     const active = verificationInFlight.get(cacheKey);
     if (active) {
       usage.shared = true;
-      const result = await active;
+      execution.publish('shared');
+      active.execution.attach(channel);
+      let result;
+      try { result = await active.run; } finally { active.execution.detach(channel); }
       return { ...result, apiUsage: usage };
     }
-    const run = usageContext.run(usage, () => analyzeInternal(answer));
-    verificationInFlight.set(cacheKey, run);
+    const run = execution.run(() => usageContext.run(usage, () => analyzeInternal(answer)));
+    const task = { run, execution };
+    verificationInFlight.set(cacheKey, task);
     try { return { ...await run, apiUsage: usage }; }
-    finally { if (verificationInFlight.get(cacheKey) === run) verificationInFlight.delete(cacheKey); }
+    finally { if (verificationInFlight.get(cacheKey) === task) verificationInFlight.delete(cacheKey); }
   } catch (error) {
     throw Object.assign(new Error(error.message), { status: error.status, code: error.code, retryAfterMs: error.retryAfterMs, apiUsage: usage });
   } finally {
@@ -316,21 +332,37 @@ async function analyze(answer) {
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (req.method === 'GET' && /^\/api\/logs\//.test(req.url)) {
+    logStreams.connect(req.url.slice('/api/logs/'.length), req, res);
+    return;
+  }
   if (req.method === 'POST' && req.url === '/api/verify') {
     let raw = '';
     req.on('data', chunk => { raw += chunk; if (raw.length > 200_000) req.destroy(); });
     req.on('end', async () => {
+      let channel;
       try {
         const body = JSON.parse(raw || '{}');
+        if (body.logId !== undefined) {
+          const candidate = logStreams.get(body.logId);
+          if (!candidate || candidate.used) throw appError('로그 연결을 다시 열어주세요.', 400, 'INVALID_LOG_SESSION');
+          channel = candidate;
+          channel.used = true; channel.active = true;
+          channel.send(makeEvent('start'));
+        }
         if (typeof body.text !== 'string' || !body.text.trim()) throw appError('검증할 답변을 입력해주세요.', 400, 'EMPTY_INPUT');
         if (body.text.length > 16_000) throw appError('입력은 16,000자까지 가능합니다.', 413, 'INPUT_TOO_LONG');
-        const result = await analyze(body.text.trim());
+        const result = await analyze(body.text.trim(), channel);
+        channel?.send(makeEvent('done', { calls: result.apiUsage.geminiCalls, retries: result.apiUsage.geminiRetries }));
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
       } catch (error) {
+        channel?.send(makeEvent('error', { code: error.code, status: error.status, calls: error.apiUsage?.geminiCalls, retries: error.apiUsage?.geminiRetries }));
         if (error.retryAfterMs) res.setHeader('Retry-After', Math.ceil(error.retryAfterMs / 1000));
         res.writeHead(error.status || 500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: error.message || '검증 중 오류가 발생했습니다.', code: error.code || 'UNKNOWN_ERROR', apiUsage: error.apiUsage }));
+      } finally {
+        if (channel) { channel.active = false; channel.send(makeEvent('end')); }
       }
     });
     return;

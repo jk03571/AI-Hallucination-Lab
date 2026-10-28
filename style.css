@@ -884,3 +884,54 @@ dialog code {
   .source-item { grid-template-columns: 1fr; }
   .source-claim { grid-column: 1; }
 }
+
+
+.logs-button {
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: var(--paper);
+  color: #38604f;
+  font: 11px var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logs-button:hover { background: var(--mint-soft); border-color: var(--mint); }
+.logs-button:focus-visible, .verification-log:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
+.logs-dialog {
+  width: min(760px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+}
+.logs-dialog[open] { display: flex; flex-direction: column; }
+.logs-heading { position: relative; padding: 23px 52px 0 24px; flex: none; }
+.logs-heading h2 { margin-bottom: 8px; }
+.logs-dialog .logs-status { margin: 0; padding: 0 24px 15px; font-size: 11px; flex: none; }
+.logs-body { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin: 0 20px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); overflow: hidden; }
+.logs-dialog .logs-empty { margin: 0; padding: 25px 16px; text-align: center; font-size: 12px; }
+.logs-empty[hidden] { display: none; }
+.verification-log { overflow-y: auto; overscroll-behavior: contain; min-height: 0; height: min(420px, 50vh); height: min(420px, 50dvh); padding: 8px 12px; font: 11px/1.7 'DM Mono', 'Noto Sans KR', monospace; }
+.log-entry { display: grid; grid-template-columns: 62px 65px minmax(0, 1fr); gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.log-entry:last-child { border-bottom: 0; }
+.log-entry time { color: var(--muted); font-size: 10px; padding-top: 1px; }
+.log-level { font-size: 10px; font-weight: 700; }
+.log-message { color: var(--text); overflow-wrap: anywhere; white-space: pre-wrap; }
+.log-info .log-level { color: var(--blue); }
+.log-success .log-level { color: var(--mint); }
+.log-warning .log-level { color: var(--yellow); }
+.log-error .log-level { color: var(--red); }
+.log-error .log-message { color: #a3342e; }
+.logs-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 20px 20px; flex: none; }
+.clipboard-buffer { position: fixed; width: 1px; height: 1px; min-height: 0; opacity: 0; }
+@media (max-width: 540px) {
+  .top-meta { gap: 6px; }
+  #mode-label { display: none; }
+  .logs-heading { padding: 20px 44px 0 18px; }
+  .logs-dialog .logs-status { padding-left: 18px; padding-right: 18px; }
+  .logs-body { margin: 0 12px; }
+  .log-entry { grid-template-columns: 58px minmax(0, 1fr); gap: 3px 8px; }
+  .log-message { grid-column: 1 / -1; }
+  .logs-actions { padding: 12px; }
+}

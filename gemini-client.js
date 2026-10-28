@@ -1,3 +1,4 @@
+import { emitLog } from './verification-logs.js';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -50,7 +51,8 @@ export function createGeminiGate({ rpm = 5, rpd = 20, statePath, now = Date.now,
   return {
     async cooldown(ms) { cooldownUntil = Math.max(cooldownUntil, now() + ms); await persist(); },
     async exhaustDay() { state.blockedDay = quotaDay(now()); await persist(); },
-    acquire() {
+    acquire(purpose) {
+      const operationContext = { purpose };
       const queuedAt = now();
       const run = tail.then(async () => {
         await load();
@@ -64,7 +66,7 @@ export function createGeminiGate({ rpm = 5, rpd = 20, statePath, now = Date.now,
             last === undefined ? 0 : last + Math.ceil(60_100 / rpm) - time,
             state.starts.length >= rpm ? state.starts[0] + 60_100 - time : 0);
           if (time - queuedAt + wait > maxWaitMs) throw quotaError('Gemini 요청 대기 시간이 길어졌습니다. 잠시 후 다시 시도해주세요.', 'GEMINI_QUEUE_LIMIT', wait);
-          if (wait > 0) { await sleep(wait); continue; }
+          if (wait > 0) { emitLog('waiting', { purpose: operationContext.purpose, ms: wait }); await sleep(wait); continue; }
           state.starts.push(time);
           state.count += 1; // Count failed/429 attempts conservatively, too.
           try { await persist(); }
@@ -81,15 +83,17 @@ export function createGeminiGate({ rpm = 5, rpd = 20, statePath, now = Date.now,
 export async function requestGemini({ request, gate, usage, purpose, maxRetries = 2,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), random = Math.random, log = console.log }) {
   for (let attempt = 0; ; attempt++) {
-    const quota = await gate.acquire();
+    emitLog('queued', { purpose });
+    const quota = await gate.acquire(purpose);
     usage.geminiCalls++;
     if (attempt) usage.geminiRetries++;
     usage.byPurpose[purpose] = (usage.byPurpose[purpose] || 0) + 1;
     log(`[verify ${usage.requestId}] Gemini call=${usage.geminiCalls} purpose=${purpose} attempt=${attempt + 1} daily=${quota.dailyUsed}/${quota.rpd} rpm=${quota.rpm}`);
+    emitLog('call', { purpose, calls: usage.geminiCalls, attempt: attempt + 1, ...quota });
     let response;
     try { response = await request(); }
     catch { throw Object.assign(new Error('Gemini API에 연결하지 못했습니다.'), { status: 502, code: 'GEMINI_NETWORK' }); }
-    if (response.ok) return response;
+    if (response.ok) { emitLog('apiSuccess', { purpose }); return response; }
     // Never log or return provider payloads: they can echo request contents or keys.
     const payload = await response.json().catch(() => ({}));
     const details = payload.error?.details || [];
@@ -107,6 +111,7 @@ export async function requestGemini({ request, gate, usage, purpose, maxRetries 
     const retryable = [429, 500, 502, 503, 504].includes(response.status);
     if (retryable && attempt < maxRetries && delay <= 180_000) {
       log(`[verify ${usage.requestId}] Gemini status=${response.status} retry=${attempt + 1}/${maxRetries} waitMs=${delay}`);
+      emitLog('retry', { status: response.status, retry: attempt + 1, maxRetries, ms: delay });
       await sleep(delay);
       continue;
     }
