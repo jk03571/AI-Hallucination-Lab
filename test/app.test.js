@@ -10,8 +10,8 @@ test('button and in-flight guard allow one fetch and recover after failure', asy
     return nodes.get(key);
   };
   let resolveFetch, calls = 0;
-  const context = vm.createContext({ document: { querySelector: node, querySelectorAll: () => [] }, setupLogs: () => ({ connect: async () => 'test-log-id' }), console: { info() {} }, setInterval: () => 1, clearInterval() {}, fetch: () => { calls++; return new Promise(resolve => { resolveFetch = resolve; }); } });
-  vm.runInContext((await readFile(new URL('../app.js', import.meta.url), 'utf8')).replace(/^import .*;\n/, ''), context);
+  const context = vm.createContext({ document: { querySelector: node, querySelectorAll: () => [] }, historyEnabled: () => false, listHistory: async () => [], clearTimeout() {}, setTimeout() {}, setupLogs: () => ({ connect: async () => 'test-log-id' }), console: { info() {} }, setInterval: () => 1, clearInterval() {}, fetch: () => { calls++; return new Promise(resolve => { resolveFetch = resolve; }); } });
+  vm.runInContext((await readFile(new URL('../app.js', import.meta.url), 'utf8')).replace(/^import .*;\r?\n/gm, ''), context);
   const first = vm.runInContext('runVerification()', context);
   await vm.runInContext('runVerification()', context);
   assert.equal(calls, 1); assert.equal(node('#verify-button').disabled, true);
