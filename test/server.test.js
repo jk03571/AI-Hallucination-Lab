@@ -1,9 +1,17 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 
 process.env.GEMINI_API_KEY = 'test-only-gemini';
 process.env.TAVILY_API_KEY = 'test-only-tavily';
+const usageDir = await mkdtemp(join(tmpdir(), 'lab-usage-'));
+process.env.GEMINI_USAGE_PATH = join(usageDir, 'usage.json');
+process.env.GEMINI_RPM = '600000';
+process.env.GEMINI_RPD = '100';
+after(() => rm(usageDir, { recursive: true, force: true }));
 const { analyze, selectClaims, searchTavily, isBlockedSource, server } = await import('../server.js');
 const nativeFetch = globalThis.fetch;
 after(() => { globalThis.fetch = nativeFetch; });
@@ -43,7 +51,8 @@ test('normal verification uses two Gemini calls, shared searches and duplicate r
   const calls = mockProviders(claims);
   const answer = claims.map(item => item.claim).join('\n');
   const [first, duplicate] = await Promise.all([analyze(answer), analyze(answer)]);
-  assert.deepEqual(first, duplicate);
+  assert.deepEqual(first.claims, duplicate.claims);
+  assert.equal(duplicate.apiUsage.shared, true);
   assert.equal(calls.gemini, 2);
   assert.equal(calls.tavily, 1);
   assert.equal(first.counts.TRUE, 2);
@@ -55,14 +64,7 @@ test('normal verification uses two Gemini calls, shared searches and duplicate r
   assert.equal(calls.gemini, 4);
   assert.equal(calls.tavily, 1);
 });
-test('extraction failure never calls Tavily; retryable statuses have three retries only', async () => {
-  for (const status of [429, 500, 502, 503, 504, 400, 401, 403, 404]) {
-    const calls = mockProviders([], { status });
-    await assert.rejects(analyze(`실패 테스트 ${status}`));
-    assert.equal(calls.tavily, 0);
-    assert.equal(calls.gemini, [429, 500, 502, 503, 504].includes(status) ? 4 : 1);
-  }
-});
+test('extraction failure skips Tavily', async () => { const calls = mockProviders([], { status: 401 }); await assert.rejects(analyze('failure')); assert.equal(calls.tavily, 0); assert.equal(calls.gemini, 1); });
 test('opinions need no search or judgment and no-result search cannot establish falsehood', async () => {
   const opinions = mockProviders([]);
   const empty = await analyze('나는 이 색깔이 좋다.');
@@ -71,7 +73,7 @@ test('opinions need no search or judgment and no-result search cannot establish 
   const claim = fixture('이름을 확인할 수 없는 연구가 발표됐다.');
   const calls = mockProviders([claim], { noEvidence: true });
   const missing = await analyze(claim.claim);
-  assert.equal(calls.gemini, 2);
+  assert.equal(calls.gemini, 1);
   assert.equal(missing.counts.UNCERTAIN, 1);
   assert.equal(missing.rateDenominator, 0);
   assert.equal(missing.correctedFacts.length, 0);

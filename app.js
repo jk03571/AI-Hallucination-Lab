@@ -1,5 +1,7 @@
 import { HISTORY_LIMIT, historyEnabled, setHistoryEnabled, listHistory, saveHistory, deleteHistory, clearHistory } from './history.js';
 
+import { setupLogs } from './log-view.js';
+const logs = setupLogs();
 const input = document.querySelector('#answer-input');
 const verifyButton = document.querySelector('#verify-button');
 const results = document.querySelector('#results');
@@ -24,7 +26,7 @@ const verdicts = {
 input.addEventListener('input', () => { count.textContent = `${input.value.length.toLocaleString()} / 16,000`; });
 document.querySelector('#example-button').addEventListener('click', () => { input.value = example; input.dispatchEvent(new Event('input')); input.focus(); });
 for (const [buttonId, dialogId] of [['about-button', 'info-dialog'], ['setup-button', 'setup-dialog']]) document.querySelector(`#${buttonId}`).addEventListener('click', () => document.querySelector(`#${dialogId}`).showModal());
-document.querySelectorAll('dialog').forEach(dialog => {
+document.querySelectorAll('#info-dialog, #setup-dialog, #history-dialog').forEach(dialog => {
   dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
   dialog.querySelector('.dialog-action')?.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
@@ -92,7 +94,8 @@ async function runVerification() {
   verifyButton.disabled = true; verifyLabel.textContent = '검증 중...'; progress.classList.remove('hidden');
   setProgress(-1, '답변의 사실 정보를 검색 근거와 비교하고 있습니다. 요청량에 따라 잠시 걸릴 수 있습니다.');
   try {
-    const response = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+    const logId = await logs.connect();
+    const response = await fetch('/api/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, logId }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '검증 요청에 실패했습니다.');
     setProgress(5, '검증 완료 ✓');

@@ -2,6 +2,12 @@
 // Start explicitly with node test/ui-preview.js; never used by npm start/dev.
 process.env.GEMINI_API_KEY = 'ui-test-only';
 process.env.TAVILY_API_KEY = 'ui-test-only';
+process.env.GEMINI_RPM = '600000';
+process.env.GEMINI_RPD = '100';
+const { mkdtemp } = await import('node:fs/promises');
+const { tmpdir } = await import('node:os');
+const { join } = await import('node:path');
+process.env.GEMINI_USAGE_PATH = join(await mkdtemp(join(tmpdir(), 'lab-preview-')), 'usage.json');
 const { server } = await import('../server.js');
 const facts = [
   ['테스트 제품 A의 무게는 120g이다.', '제품 A', 'NUMBER', 'TRUE', '제품 A의 무게는 120g이다. 공식 사양의 측정값이다.'],
