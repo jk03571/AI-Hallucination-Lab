@@ -364,7 +364,7 @@ textarea:focus {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   border: 1px solid var(--line);
   border-radius: 8px;
   margin: 16px 0 28px;
@@ -577,15 +577,91 @@ textarea:focus {
 .source-link:hover { text-decoration: underline; }
 
 .source-snippet {
-  grid-column: 1;
+  grid-column: 1 / -1;
   color: #667b72;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.65;
 }
 
 .source-claim {
   font: 9px 'DM Mono', monospace;
   color: #718179;
+}
+
+/* Context-aware facts and browser-local history retain the existing light theme. */
+.subject-group { min-width: 0; }
+.subject-group > h3 { font-size: 16px; margin: 24px 0 12px; color: #245d49; overflow-wrap: anywhere; }
+.subject-group .claim + .claim { margin-top: 12px; }
+.claim { scroll-margin-top: 20px; }
+.claim-text { font-size: 15px; overflow-wrap: anywhere; }
+.claim-reason, .correction { font-size: 13px; }
+.claim-number, .claim-verdict-line, .sources-label { font-size: 11px; }
+.claim-reason b { margin-right: 6px; }
+.claim-top .verdict { flex-shrink: 0; }
+.source-heading { min-width: 0; }
+.source-link { font-size: 13px; font-weight: 600; }
+.source-domain { display: block; font-size: 11px; color: #72847d; overflow-wrap: anywhere; margin-top: 4px; }
+.source-snippet { min-width: 0; overflow-wrap: anywhere; }
+.source-snippet blockquote { border-left: 3px solid #a2cbbc; margin: 8px 0; padding: 7px 12px; background: #f1f8f5; color: #304e41; }
+.source-snippet p { margin: 6px 0; }
+.source-claim { max-width: 230px; line-height: 1.6; }
+.evidence-detail, .item-detail, .reference-sources { margin-top: 10px; font-size: 12px; color: #667b72; }
+summary { cursor: pointer; }
+.item-detail p, .evidence-detail p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reference-sources > summary { padding: 4px 0; }
+.hallucination-summary .coverage-value { color: #24675c; }
+.hallucination-summary { grid-template-columns: 1fr 1fr; }
+.rate-explanation { font-size: 12px; color: #60756c; margin: 0; }
+.summary-name { font-size: 11px; }
+.finding-summary { margin: 22px 0; padding: 20px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 13px; }
+.finding-summary h3 { margin: 0 0 10px; font-size: 16px; }
+.finding-summary ul, .excluded-panel ul, .corrected-facts { padding-left: 20px; line-height: 1.8; }
+.finding-summary li + li, .corrected-facts li + li { margin-top: 10px; }
+.finding-summary a, .corrected-facts a { color: #126e52; text-underline-offset: 3px; }
+.finding-summary li span, .excluded-panel li span { display: block; color: #667b72; margin: 3px 0 10px; }
+.excluded-panel { padding: 18px; background: #f5f8f6; border: 1px solid var(--line); border-radius: 8px; margin-top: 20px; font-size: 13px; }
+.corrected-facts { font-size: 14px; overflow-wrap: anywhere; }
+.saved-banner { padding: 13px 16px; border-radius: 6px; background: #e7f1f7; font-size: 13px; color: #315f74; margin: 14px 0; }
+#storage-notice:empty { display: none; }
+#history-count { display: inline-grid; place-items: center; min-width: 22px; min-height: 22px; border-radius: 20px; background: #e4efe9; color: #245d49; }
+#history-dialog { width: min(660px, calc(100vw - 32px)); max-width: none; box-sizing: border-box; max-height: 86vh; overflow-y: auto; }
+.history-settings { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 18px 0; font-size: 13px; }
+.history-settings label { display: flex; gap: 8px; align-items: center; }
+.history-settings input { width: 18px; height: 18px; accent-color: #15775b; }
+.history-entry { padding: 18px 0; border-top: 1px solid var(--line); }
+.history-entry time, .history-entry small { color: #677f73; font-size: 12px; }
+.history-entry p { font-size: 14px; margin: 8px 0; overflow-wrap: anywhere; }
+.history-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.history-actions button { border: 1px solid #c6dcd2; padding: 9px 13px; background: #f4f9f6; border-radius: 5px; color: #245d49; cursor: pointer; min-height: 42px; }
+.history-actions button:first-child { background: #e4f2eb; font-weight: 600; }
+#history-message { font-size: 13px; color: #86611d; }
+#history-message:empty { display: none; }
+.empty-history { text-align: center; padding: 30px 0; color: #667b72; }
+.progress-panel.is-running #progress-bar { width: 35%; animation: working 1.7s ease-in-out infinite; }
+.progress-panel:not(.is-running) #progress-bar { width: 100%; }
+.progress-head { flex-wrap: wrap; gap: 10px; }
+.progress-label { max-width: 100%; }
+@keyframes working { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid #187a61; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .progress-panel.is-running #progress-bar { animation: none; width: 100%; opacity: .5; } }
+@media (max-width: 800px) {
+  .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .claim-top { flex-direction: column; gap: 9px; }
+  .result-header, .claims-title { flex-wrap: wrap; gap: 10px; }
+  .source-item { grid-template-columns: 1fr; }
+  .source-snippet { grid-column: 1; }
+  .top-meta #mode-label, .top-meta .live-indicator { display: none; }
+}
+@media (max-width: 480px) {
+  .hallucination-summary { grid-template-columns: 1fr; }
+  .summary-cell { padding: 12px; }
+  .input-actions { align-items: stretch; }
+  .topbar { gap: 12px; }
+  .brand { font-size: 10px; }
+  .top-meta { gap: 10px; }
+  .history-settings { align-items: flex-start; flex-wrap: wrap; }
+  .source-claim { max-width: none; }
+  .verdict { white-space: normal; }
 }
 
 .answer-panel {
@@ -829,7 +905,8 @@ dialog code {
     gap: 9px;
   }
   .input-actions { gap: 9px; }
-  .privacy-note { display: none; }
+  .privacy-note { display: block; font-size: 10px; max-width: 190px; text-align: right; }
+  .input-actions { flex-direction: column; align-items: flex-end; }
   .primary-button {
     gap: 11px;
     padding: 10px 11px;
@@ -856,7 +933,7 @@ dialog code {
   .summary-num { font-size: 18px; }
   .summary-name { font-size: 9px; }
   .claim-main { padding: 13px 12px; }
-  .claim-text { font-size: 12px; }
+  .claim-text { font-size: 14px; }
   .claim-top { gap: 8px; }
   .verdict {
     font-size: 9px;
